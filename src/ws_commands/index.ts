@@ -2,6 +2,7 @@ import {
   EmptyRoom,
   GameField,
   Room,
+  Ship,
   User,
   UserAuth,
   WSUser,
@@ -16,6 +17,8 @@ const winners: Winner[] = [];
 
 export const userAuth = ({ name, password }: UserAuth, ws: WSUser) => {
   const index = uuidv4();
+  ws.name = name;
+  ws.id = index;
   users.push({ name, id: index, password, ws });
   ws.send(
     JSON.stringify({
@@ -52,7 +55,7 @@ export const getEmptyRooms = () => {
   return roomList;
 };
 
-export const updateRooms = () => {
+const updateRooms = () => {
   const roomList = getEmptyRooms();
   users.forEach((user) =>
     user.ws.send(
@@ -65,7 +68,7 @@ export const updateRooms = () => {
   );
 };
 
-export const updateWinners = () => {
+const updateWinners = () => {
   users.forEach((user) =>
     user.ws.send(
       JSON.stringify({
@@ -78,30 +81,31 @@ export const updateWinners = () => {
 };
 
 export const addUser = (indexRoom: string, secondUser: WSUser) => {
+  console.log(indexRoom);
   const room = rooms.get(indexRoom);
   const isNotEqual = room?.firstUser && room.firstUser.id === secondUser.id;
-  if (!room || !room.firstUser || !room.secondUser || isNotEqual) return;
-
+  if (!room || !room.firstUser || !secondUser || isNotEqual) return;
+  console.log(indexRoom);
   room!.secondUser = secondUser;
-  const indexGame = uuidv4();
 
   const gameField: GameField = {
-    id: indexGame,
     firstUser: room.firstUser,
     secondUser: room.secondUser,
     firstUserShips: [],
     secondUserShips: [],
-    isPLayed: false,
+    isPlayed: false,
+    activePlayerId: 0,
   };
 
   room.field = gameField;
   const roomUsers = [room.firstUser, room.secondUser];
+  updateRooms();
   roomUsers.forEach((user, index) => {
     user.send(
       JSON.stringify({
         type: WsCommands.CreateGame,
         data: JSON.stringify({
-          idGame: indexGame,
+          idGame: indexRoom,
           idPlayer: index,
         }),
       }),
@@ -109,4 +113,44 @@ export const addUser = (indexRoom: string, secondUser: WSUser) => {
   });
 };
 
-export const addShips = () => {};
+export const addShips = (
+  gameId: string,
+  ships: Ship[],
+  indexPlayer: number,
+) => {
+  const field = rooms.get(gameId)?.field;
+
+  if (!field) return;
+
+  if (indexPlayer === 0) {
+    field.firstUserShips = ships;
+    field.activePlayerId = 0;
+  } else {
+    field.secondUserShips = ships;
+    field.activePlayerId = 1;
+  }
+
+  const users = [field.firstUser, field.secondUser];
+
+  if (!field.firstUserShips.length || !field.secondUserShips.length) return;
+
+  users.forEach((user) => {
+    user.send(
+      JSON.stringify({
+        type: WsCommands.StartGame,
+        data: JSON.stringify({
+          ships:
+            user === field.firstUser
+              ? field.firstUserShips
+              : field.secondUserShips,
+          currentPlayerIndex: field.activePlayerId,
+        }),
+        id: 0,
+      }),
+    );
+  });
+};
+
+const sendTurn = () => {
+  
+};

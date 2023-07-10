@@ -50,12 +50,12 @@ export interface UserAuth {
 }
 
 export interface GameField {
-  id: string;
   firstUserShips: Ship[];
   secondUserShips: Ship[];
   firstUser: WSUser;
   secondUser: WSUser;
-  isPLayed: boolean;
+  isPlayed: boolean;
+  activePlayerId: 0 | 1;
 }
 
 export interface Ship {
@@ -68,5 +68,4 @@ export interface Ship {
 export interface WSUser extends WebSocket {
   id: string;
   name: string;
-  password: string;
 }
