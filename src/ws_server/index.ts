@@ -1,8 +1,8 @@
 import { UserAuth, WSUser, WsCommands, WsResponse } from '../model';
-import { RawData, WebSocketServer, Server } from 'ws';
+import { RawData, WebSocketServer } from 'ws';
 import { addUser, createRoom, userAuth } from '../ws_commands';
-const WS_PORT = 3000;
 
+const WS_PORT = 3000;
 const wss = new WebSocketServer({ port: WS_PORT });
 
 wss.on('connection', (ws: WSUser) => {
@@ -21,6 +21,10 @@ wss.on('connection', (ws: WSUser) => {
       case WsCommands.AddUser:
         const { indexRoom } = JSON.parse(obj.data) as { indexRoom: string };
         addUser(indexRoom, ws);
+        break;
+      case WsCommands.AddShips:
+        // const { indexRoom } = JSON.parse(obj.data) as { indexRoom: string };
+        // addUser(indexRoom, ws);
         break;
       default:
         console.log(`Type ${type} unknown`);

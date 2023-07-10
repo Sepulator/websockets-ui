@@ -1,5 +1,6 @@
 import {
   EmptyRoom,
+  GameField,
   Room,
   User,
   UserAuth,
@@ -78,8 +79,34 @@ export const updateWinners = () => {
 
 export const addUser = (indexRoom: string, secondUser: WSUser) => {
   const room = rooms.get(indexRoom);
-  const notEqual = room?.firstUser && room.firstUser.id === secondUser.id;
-  if (!room || room.secondUser || notEqual) return;
+  const isNotEqual = room?.firstUser && room.firstUser.id === secondUser.id;
+  if (!room || !room.firstUser || !room.secondUser || isNotEqual) return;
 
   room!.secondUser = secondUser;
+  const indexGame = uuidv4();
+
+  const gameField: GameField = {
+    id: indexGame,
+    firstUser: room.firstUser,
+    secondUser: room.secondUser,
+    firstUserShips: [],
+    secondUserShips: [],
+    isPLayed: false,
+  };
+
+  room.field = gameField;
+  const roomUsers = [room.firstUser, room.secondUser];
+  roomUsers.forEach((user, index) => {
+    user.send(
+      JSON.stringify({
+        type: WsCommands.CreateGame,
+        data: JSON.stringify({
+          idGame: indexGame,
+          idPlayer: index,
+        }),
+      }),
+    );
+  });
 };
+
+export const addShips = () => {};

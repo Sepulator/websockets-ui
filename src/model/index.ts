@@ -51,10 +51,14 @@ export interface UserAuth {
 
 export interface GameField {
   id: string;
-  firstUserShips: Ships[];
+  firstUserShips: Ship[];
+  secondUserShips: Ship[];
+  firstUser: WSUser;
+  secondUser: WSUser;
+  isPLayed: boolean;
 }
 
-export interface Ships {
+export interface Ship {
   position: { x: number; y: number };
   direction: boolean;
   length: number;
