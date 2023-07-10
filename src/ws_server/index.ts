@@ -1,19 +1,26 @@
-import { UserAuth, WsCommands, WsResponse } from '../model';
-import WebSocket, { RawData, WebSocketServer } from 'ws';
-import { userAuth } from '../ws_commands';
-
+import { UserAuth, WSUser, WsCommands, WsResponse } from '../model';
+import { RawData, WebSocketServer, Server } from 'ws';
+import { addUser, createRoom, userAuth } from '../ws_commands';
 const WS_PORT = 3000;
 
 const wss = new WebSocketServer({ port: WS_PORT });
 
-wss.on('connection', (ws: WebSocket) => {
-  ws.on('message', (data: RawData) => {
+wss.on('connection', (ws: WSUser) => {
+  ws.on('message', async (data: RawData) => {
     const obj = JSON.parse(data.toString()) as WsResponse;
     const type = obj.type;
 
     switch (type) {
       case WsCommands.UserAuth:
-        userAuth(obj.data as UserAuth, ws);
+        const user = JSON.parse(obj.data) as UserAuth;
+        userAuth(user, ws);
+        break;
+      case WsCommands.CreateRoom:
+        createRoom(ws);
+        break;
+      case WsCommands.AddUser:
+        const { indexRoom } = JSON.parse(obj.data) as { indexRoom: string };
+        addUser(indexRoom, ws);
         break;
       default:
         console.log(`Type ${type} unknown`);
