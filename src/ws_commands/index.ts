@@ -151,6 +151,17 @@ export const addShips = (
   });
 };
 
-const sendTurn = () => {
-  
+const sendTurn = (field: GameField) => {
+  field.activePlayerId = field.activePlayerId === 0 ? 1 : 0;
+
+  const users = [field.firstUser, field.secondUser];
+  users.forEach((user) => {
+    user.send(
+      JSON.stringify({
+        type: WsCommands.Turn,
+        data: JSON.stringify({ currentPLayer: field.activePlayerId }),
+        id: 0,
+      }),
+    );
+  });
 };
