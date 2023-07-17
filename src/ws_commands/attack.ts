@@ -1,11 +1,22 @@
-import { GameField, MAP_SIZE, Position, ShipStatus, WsCommands, rooms } from '../model';
+import {
+  GameField,
+  MAP_SIZE,
+  Position,
+  ShipStatus,
+  WSUser,
+  WsCommands,
+  rooms,
+} from '../model';
 
-export const attack = (attackData: {
-  gameId: string;
-  x: number;
-  y: number;
-  indexPlayer: 0 | 1;
-}) => {
+export const attack = (
+  attackData: {
+    gameId: string;
+    x: number;
+    y: number;
+    indexPlayer: 0 | 1;
+  },
+  ws?: WSUser,
+) => {
   const { gameId, x, y, indexPlayer } = { ...attackData };
   const field = rooms.get(gameId)?.field;
   if (!field) return;
@@ -61,7 +72,7 @@ export const attack = (attackData: {
 
   const allShipsKilled = shipsDraft.every((ship) => ship.length === 0);
   if (allShipsKilled) {
-    const id = gameId;
+    const id = ws!.id;
     finishGame(id, field);
   }
 

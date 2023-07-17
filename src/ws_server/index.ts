@@ -44,7 +44,7 @@ wss.on('connection', (ws: WSUser) => {
           y: number;
           indexPlayer: 0 | 1;
         };
-        attack({ ...attackData });
+        attack({ ...attackData }, ws);
         break;
       case WsCommands.RandomAttack:
         const randomAttackData = JSON.parse(obj.data) as {
