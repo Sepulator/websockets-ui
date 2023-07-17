@@ -59,10 +59,12 @@ export interface GameField {
   firstUserShipsData: {
     ships: Position[][];
     killed: Position[][];
+    shots: Position[];
   };
   secondUserShipsData: {
     ships: Position[][];
     killed: Position[][];
+    shots: Position[];
   };
 }
 

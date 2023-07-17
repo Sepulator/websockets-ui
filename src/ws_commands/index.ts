@@ -99,8 +99,8 @@ export const addUser = (indexRoom: string, secondUser: WSUser) => {
     secondUserShips: [],
     isPlayed: false,
     activePlayerId: 0,
-    firstUserShipsData: { ships: [[]], killed: [[]] },
-    secondUserShipsData: { ships: [[]], killed: [[]] },
+    firstUserShipsData: { ships: [[]], killed: [[]], shots: [] },
+    secondUserShipsData: { ships: [[]], killed: [[]], shots: [] },
   };
 
   room.field = gameField;
@@ -203,18 +203,26 @@ export const attack = (attackData: {
   const field = rooms.get(gameId)?.field;
   if (!field) return;
 
-  const { ships, killed } = !indexPlayer
-    ? field.secondUserShipsData
-    : field.firstUserShipsData;
+  const { ships, killed, shots } =
+    indexPlayer === 1 ? field.firstUserShipsData : field.secondUserShipsData;
+
+  if (shots.some((shot) => shot.x === x && shot.y === y)) {
+    sendTurn(field);
+    return;
+  } else {
+    shots.push({ x, y });
+    sendTurn(field);
+  }
 
   const { killedDraft, shipsDraft, status, data } = attackShip(
     x,
     y,
     ships,
     killed,
+    shots,
   );
 
-  if (indexPlayer) {
+  if (!indexPlayer) {
     field.secondUserShipsData.ships = shipsDraft;
     field.secondUserShipsData.killed = killedDraft;
   } else {
@@ -252,6 +260,7 @@ const attackShip = (
   y: number,
   ships: Position[][],
   killed: Position[][],
+  shots: Position[],
 ): {
   shipsDraft: Position[][];
   killedDraft: Position[][];
@@ -265,6 +274,7 @@ const attackShip = (
 } => {
   const shipsDraft = ships.slice();
   const killedDraft = killed.slice();
+  const shotsDraft = shots.slice();
   let status: ShipStatus = 'miss';
   let data:
     | {
@@ -327,6 +337,23 @@ export const randomAttack = (randomAttackData: {
   indexPlayer: 0 | 1;
 }) => {
   const { gameId, indexPlayer } = { ...randomAttackData };
+  const field = rooms.get(gameId)?.field;
+  if (!field) return;
+  const { ships, killed, shots } =
+    indexPlayer === 1 ? field.firstUserShipsData : field.secondUserShipsData;
+  let coor = getRandomPosition();
+
+  while (!shots.some((shot) => shot.x === coor.x && shot.y === coor.y)) {
+    coor = getRandomPosition();
+  }
+  const attackData = { gameId, x: coor.x, y: coor.y, indexPlayer };
+  attack(attackData);
+};
+
+const getRandomPosition = () => {
+  const x = Math.ceil(Math.random() * 10) - 1;
+  const y = Math.ceil(Math.random() * 10) - 1;
+  return { x, y };
 };
 
 const sendAttackData = (
