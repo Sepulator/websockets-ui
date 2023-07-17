@@ -1,11 +1,11 @@
-import { stat } from 'fs';
+import { kill } from 'process';
 import {
   EmptyRoom,
   GameField,
   Position,
   Room,
   Ship,
-  ShortShip,
+  ShipStatus,
   User,
   UserAuth,
   WSUser,
@@ -13,11 +13,11 @@ import {
   WsCommands,
 } from '../model';
 import { v4 as uuidv4 } from 'uuid';
-import { kill } from 'process';
 
 const users: User[] = [];
 const rooms: Map<string, Room> = new Map();
 const winners: Winner[] = [];
+const MAP_SIZE = 9;
 
 export const userAuth = ({ name, password }: UserAuth, ws: WSUser) => {
   const index = uuidv4();
@@ -99,8 +99,8 @@ export const addUser = (indexRoom: string, secondUser: WSUser) => {
     secondUserShips: [],
     isPlayed: false,
     activePlayerId: 0,
-    firstUserShipArr: { ships: [[]], killed: [[]], shots: [] },
-    secondUserShipArr: { ships: [[]], killed: [[]], shots: [] },
+    firstUserShipsData: { ships: [[]], killed: [[]] },
+    secondUserShipsData: { ships: [[]], killed: [[]] },
   };
 
   room.field = gameField;
@@ -131,14 +131,14 @@ export const addShips = (
     field.firstUserShips = ships;
     field.activePlayerId = 0;
     const { shipsCoor, killedCoor } = initShipsCoor(ships);
-    field.firstUserShipArr.ships = shipsCoor;
-    field.firstUserShipArr.killed = killedCoor;
+    field.firstUserShipsData.ships = shipsCoor;
+    field.firstUserShipsData.killed = killedCoor;
   } else {
     field.secondUserShips = ships;
     field.activePlayerId = 1;
     const { shipsCoor, killedCoor } = initShipsCoor(ships);
-    field.secondUserShipArr.ships = shipsCoor;
-    field.secondUserShipArr.killed = killedCoor;
+    field.secondUserShipsData.ships = shipsCoor;
+    field.secondUserShipsData.killed = killedCoor;
   }
 
   const users = [field.firstUser, field.secondUser];
@@ -180,17 +180,13 @@ const initShipsCoor = (ships: Ship[]) => {
   return { shipsCoor, killedCoor };
 };
 
-const sendTurn = (field: GameField, status: 'miss' | 'killed' | 'shot') => {
-  if (status === 'miss') {
-    field.activePlayerId = field.activePlayerId === 0 ? 1 : 0;
-  }
-
+const sendTurn = (field: GameField) => {
   const users = [field.firstUser, field.secondUser];
   users.forEach((user) => {
     user.send(
       JSON.stringify({
         type: WsCommands.Turn,
-        data: JSON.stringify({ currentPLayer: field.activePlayerId }),
+        data: JSON.stringify({ currentPlayer: field.activePlayerId }),
         id: 0,
       }),
     );
@@ -206,8 +202,49 @@ export const attack = (attackData: {
   const { gameId, x, y, indexPlayer } = { ...attackData };
   const field = rooms.get(gameId)?.field;
   if (!field) return;
-  if (indexPlayer === 0) {
+
+  const { ships, killed } = !indexPlayer
+    ? field.secondUserShipsData
+    : field.firstUserShipsData;
+
+  const { killedDraft, shipsDraft, status, data } = attackShip(
+    x,
+    y,
+    ships,
+    killed,
+  );
+
+  if (indexPlayer) {
+    field.secondUserShipsData.ships = shipsDraft;
+    field.secondUserShipsData.killed = killedDraft;
+  } else {
+    field.firstUserShipsData.ships = shipsDraft;
+    field.firstUserShipsData.killed = killedDraft;
   }
+  const currentPlayer = indexPlayer;
+  const position = { x, y };
+
+  sendAttackData(gameId, position, currentPlayer, status);
+
+  if (status === 'killed') {
+    data?.filtered.forEach((coor) => {
+      const position = coor;
+      const status = 'miss';
+      sendAttackData(gameId, position, currentPlayer, status);
+    });
+
+    data?.killed.forEach((coor) => {
+      const position = coor;
+      const status = 'killed';
+      sendAttackData(gameId, position, currentPlayer, status);
+    });
+  }
+
+  if (status === 'miss') {
+    field.activePlayerId = field.activePlayerId === 0 ? 1 : 0;
+  }
+
+  sendTurn(field);
 };
 
 const attackShip = (
@@ -215,25 +252,74 @@ const attackShip = (
   y: number,
   ships: Position[][],
   killed: Position[][],
-  shots: Position[],
-) => {
-  const shotsDraft = shots.slice();
+): {
+  shipsDraft: Position[][];
+  killedDraft: Position[][];
+  status: ShipStatus;
+  data:
+    | {
+        filtered: Position[];
+        killed: Position[];
+      }
+    | undefined;
+} => {
   const shipsDraft = ships.slice();
   const killedDraft = killed.slice();
-  const isShotOld = shots.some((shot) => shot.x === x && shot.y === y);
-
-  if (isShotOld) return { shipsDraft, killedDraft, shotsDraft };
+  let status: ShipStatus = 'miss';
+  let data:
+    | {
+        filtered: Position[];
+        killed: Position[];
+      }
+    | undefined;
 
   ships.forEach((ship, shipIdx) => {
-    ship.forEach((coor, posIdx) => {
-      if (coor.x === x && coor.y === y) {
-        shotsDraft.push({ x, y });
-        killedDraft[shipIdx]?.push();
-      }
-    });
+    if (ship.length !== 0) {
+      ship.forEach((coor, coorIdx) => {
+        if (coor.x === x && coor.y === y) {
+          killedDraft[shipIdx]?.push({ x, y });
+          shipsDraft[shipIdx]?.splice(coorIdx, 1);
+          status = 'shot';
+        }
+
+        const isShipsKilled = shipsDraft[shipIdx]?.length;
+
+        if (!isShipsKilled) {
+          status = 'killed';
+          data = initEdgeCoors(killedDraft[shipIdx]);
+        }
+      });
+    }
   });
 
-  return { shipsDraft, killedDraft, shotsDraft };
+  //const allShipsKilled = shipsDraft.every((ship) => ship.length);
+  return { shipsDraft, killedDraft, status, data };
+};
+
+const initEdgeCoors = (killed: Position[] | undefined) => {
+  const edgeCoors: Position[] = [];
+  if (!killed) return;
+
+  killed.forEach((coor) => {
+    edgeCoors.push({ x: coor.x - 1, y: coor.y });
+    edgeCoors.push({ x: coor.x, y: coor.y - 1 });
+
+    edgeCoors.push({ x: coor.x - 1, y: coor.y - 1 });
+    edgeCoors.push({ x: coor.x + 1, y: coor.y + 1 });
+
+    edgeCoors.push({ x: coor.x + 1, y: coor.y - 1 });
+    edgeCoors.push({ x: coor.x - 1, y: coor.y + 1 });
+
+    edgeCoors.push({ x: coor.x + 1, y: coor.y });
+    edgeCoors.push({ x: coor.x, y: coor.y + 1 });
+  });
+
+  const filtered = edgeCoors.filter(
+    (coor) =>
+      coor.x >= 0 && coor.x <= MAP_SIZE && coor.y >= 0 && coor.y <= MAP_SIZE,
+  );
+  const data = { filtered, killed };
+  return data;
 };
 
 export const randomAttack = (randomAttackData: {
@@ -250,7 +336,7 @@ const sendAttackData = (
     y: number;
   },
   currentPlayer: number,
-  status: 'miss' | 'killed' | 'shot',
+  status: ShipStatus,
 ) => {
   const field = rooms.get(id)?.field;
   if (!field) return;
