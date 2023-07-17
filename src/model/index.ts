@@ -56,13 +56,35 @@ export interface GameField {
   secondUser: WSUser;
   isPlayed: boolean;
   activePlayerId: 0 | 1;
+  firstUserShipArr: {
+    ships: Position[][];
+    killed: Position[][];
+    shots: Position[];
+  };
+  secondUserShipArr: {
+    ships: Position[][];
+    killed: Position[][];
+    shots: Position[];
+  };
 }
 
+const arr: Position[][] = [[{ x: 1, y: 2 }]];
+
 export interface Ship {
-  position: { x: number; y: number };
+  position: Position;
   direction: boolean;
   length: number;
   type: 'small' | 'medium' | 'large' | 'huge';
+}
+
+export type Position = {
+  x: number;
+  y: number;
+};
+
+export interface ShortShip {
+  x: number;
+  y: number;
 }
 
 export interface WSUser extends WebSocket {

@@ -1,8 +1,11 @@
+import { stat } from 'fs';
 import {
   EmptyRoom,
   GameField,
+  Position,
   Room,
   Ship,
+  ShortShip,
   User,
   UserAuth,
   WSUser,
@@ -10,6 +13,7 @@ import {
   WsCommands,
 } from '../model';
 import { v4 as uuidv4 } from 'uuid';
+import { kill } from 'process';
 
 const users: User[] = [];
 const rooms: Map<string, Room> = new Map();
@@ -95,6 +99,8 @@ export const addUser = (indexRoom: string, secondUser: WSUser) => {
     secondUserShips: [],
     isPlayed: false,
     activePlayerId: 0,
+    firstUserShipArr: { ships: [[]], killed: [[]], shots: [] },
+    secondUserShipArr: { ships: [[]], killed: [[]], shots: [] },
   };
 
   room.field = gameField;
@@ -119,15 +125,20 @@ export const addShips = (
   indexPlayer: number,
 ) => {
   const field = rooms.get(gameId)?.field;
-
   if (!field) return;
 
   if (indexPlayer === 0) {
     field.firstUserShips = ships;
     field.activePlayerId = 0;
+    const { shipsCoor, killedCoor } = initShipsCoor(ships);
+    field.firstUserShipArr.ships = shipsCoor;
+    field.firstUserShipArr.killed = killedCoor;
   } else {
     field.secondUserShips = ships;
     field.activePlayerId = 1;
+    const { shipsCoor, killedCoor } = initShipsCoor(ships);
+    field.secondUserShipArr.ships = shipsCoor;
+    field.secondUserShipArr.killed = killedCoor;
   }
 
   const users = [field.firstUser, field.secondUser];
@@ -151,8 +162,28 @@ export const addShips = (
   });
 };
 
-const sendTurn = (field: GameField) => {
-  field.activePlayerId = field.activePlayerId === 0 ? 1 : 0;
+const initShipsCoor = (ships: Ship[]) => {
+  const shipsCoor: Position[][] = [];
+  const killedCoor: Position[][] = [];
+  ships.forEach((ship) => {
+    const shipCoor: Position[] = [];
+    for (let i = 0; i < ship.length; i++) {
+      if (ship.direction) {
+        shipCoor.push({ x: ship.position.x, y: ship.position.y + i });
+      } else {
+        shipCoor.push({ x: ship.position.x + i, y: ship.position.y });
+      }
+    }
+    shipsCoor.push(shipCoor);
+    killedCoor.push([]);
+  });
+  return { shipsCoor, killedCoor };
+};
+
+const sendTurn = (field: GameField, status: 'miss' | 'killed' | 'shot') => {
+  if (status === 'miss') {
+    field.activePlayerId = field.activePlayerId === 0 ? 1 : 0;
+  }
 
   const users = [field.firstUser, field.secondUser];
   users.forEach((user) => {
@@ -164,4 +195,75 @@ const sendTurn = (field: GameField) => {
       }),
     );
   });
+};
+
+export const attack = (attackData: {
+  gameId: string;
+  x: number;
+  y: number;
+  indexPlayer: 0 | 1;
+}) => {
+  const { gameId, x, y, indexPlayer } = { ...attackData };
+  const field = rooms.get(gameId)?.field;
+  if (!field) return;
+  if (indexPlayer === 0) {
+  }
+};
+
+const attackShip = (
+  x: number,
+  y: number,
+  ships: Position[][],
+  killed: Position[][],
+  shots: Position[],
+) => {
+  const shotsDraft = shots.slice();
+  const shipsDraft = ships.slice();
+  const killedDraft = killed.slice();
+  const isShotOld = shots.some((shot) => shot.x === x && shot.y === y);
+
+  if (isShotOld) return { shipsDraft, killedDraft, shotsDraft };
+
+  ships.forEach((ship, shipIdx) => {
+    ship.forEach((coor, posIdx) => {
+      if (coor.x === x && coor.y === y) {
+        shotsDraft.push({ x, y });
+        killedDraft[shipIdx]?.push();
+      }
+    });
+  });
+
+  return { shipsDraft, killedDraft, shotsDraft };
+};
+
+export const randomAttack = (randomAttackData: {
+  gameId: string;
+  indexPlayer: 0 | 1;
+}) => {
+  const { gameId, indexPlayer } = { ...randomAttackData };
+};
+
+const sendAttackData = (
+  id: string,
+  position: {
+    x: number;
+    y: number;
+  },
+  currentPlayer: number,
+  status: 'miss' | 'killed' | 'shot',
+) => {
+  const field = rooms.get(id)?.field;
+  if (!field) return;
+
+  const users = [field.firstUser, field.secondUser];
+
+  users.forEach((user) =>
+    user.send(
+      JSON.stringify({
+        type: WsCommands.Attack,
+        data: JSON.stringify({ position, currentPlayer, status }),
+        id: 0,
+      }),
+    ),
+  );
 };
