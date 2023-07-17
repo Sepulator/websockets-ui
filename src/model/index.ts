@@ -1,5 +1,10 @@
 import WebSocket from 'ws';
 
+export const users: User[] = [];
+export const rooms: Map<string, Room> = new Map();
+export const winners: Winner[] = [];
+export const MAP_SIZE = 9;
+
 export interface WsResponse {
   type: WsCommands;
   data: string;
