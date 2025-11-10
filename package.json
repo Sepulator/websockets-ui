@@ -1,21 +1,47 @@
 {
-    "name": "ws_task",
-    "version": "1.0.0",
-    "description": "Template for the WebSocket remote control task",
-    "main": "index.js",
-    "type": "module",
-    "scripts": {
-        "start": "node ./index.js",
-        "start:dev": "nodemon ./index.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
-    "author": "Andrei Auchynnikau",
-    "keywords": [],
-    "license": "ISC",
-    "devDependencies": {
-        "nodemon": "^2.0.16"
-    },
-    "dependencies": {
-        "ws": "^8.8.0"
-    }
+  "name": "battleship-ws",
+  "version": "1.0.0",
+  "description": "Battleship WebSocket server with TypeScript",
+  "main": "dist/server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx index.ts",
+    "start:dev": "tsx watch index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "author": "Yuri Skrypal",
+  "keywords": [
+    "websocket",
+    "typescript",
+    "nodejs",
+    "battleship"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "dotenv": "^17.2.3",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "nodemon": "^2.0.22",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0",
+    "ws": "^8.18.3"
+  }
 }
