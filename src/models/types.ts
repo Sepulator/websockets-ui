@@ -6,12 +6,12 @@ export interface PlayerAuth {
 }
 
 export interface PlayerWS extends WebSocket {
-  id: string;
+  index: string;
   name: string;
 }
 
 export interface Player {
-  id: string;
+  index: string;
   name: string;
   password: string;
   ws: PlayerWS;
@@ -22,8 +22,13 @@ export interface Winner {
   wins: number;
 }
 
+export interface Game {
+  first: PlayerWS;
+  second: PlayerWS | null;
+}
+
 export interface Room {
-  roomId: number;
+  roomId: string;
   roomUsers: { name: string; index: string }[];
 }
 

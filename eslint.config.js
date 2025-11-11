@@ -16,10 +16,7 @@ export default defineConfig([
         tsconfigRootDir: process.cwd(),
       },
     },
-    env: {
-      node: true,
-      es2022: true,
-    },
+
     plugins: {
       '@typescript-eslint': typescriptEslint,
       prettier: prettierPlugin,
