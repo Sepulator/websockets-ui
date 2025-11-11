@@ -17,6 +17,16 @@ export interface Player {
   ws: PlayerWS;
 }
 
+export interface Winner {
+  name: string;
+  wins: number;
+}
+
+export interface Room {
+  roomId: number;
+  roomUsers: { name: string; index: string }[];
+}
+
 export interface WebSocketMessage {
   type: MessageType;
   data: string;
@@ -27,11 +37,11 @@ export enum MessageType {
   auth = 'reg',
   createGame = 'create_game',
   startGame = 'start_game',
-  updateRoom = ' update_room',
+  updateRoom = 'update_room',
   createRoom = 'create_room',
   updateWinners = 'update_winners',
   finishGame = 'finish',
-  addUserToRoom = 'add_user_to_room',
+  addToRoom = 'add_user_to_room',
   addShips = 'add_ships',
   attack = 'attack',
   turn = 'turn',
