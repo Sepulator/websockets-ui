@@ -38,6 +38,24 @@ export interface WebSocketMessage {
   id: number;
 }
 
+export interface Ship {
+  position: Position;
+  direction: boolean;
+  length: number;
+  type: 'small' | 'medium' | 'large' | 'huge';
+}
+
+export interface GameBoard {
+  gameId: string;
+  ships: Ship[];
+  indexPlayer: string;
+}
+
+export interface Position {
+  x: number;
+  y: number;
+}
+
 export enum MessageType {
   auth = 'reg',
   createGame = 'create_game',
