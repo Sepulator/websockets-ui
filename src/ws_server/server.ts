@@ -1,4 +1,4 @@
-import { MessageType, PlayerAuth, PlayerWS, WebSocketMessage } from '@/models/types';
+import { Game, MessageType, PlayerAuth, PlayerWS, Ships, WebSocketMessage } from '@/models/types';
 import { WebSocketServer } from 'ws';
 import { v4 as uuidV4 } from 'uuid';
 import { games, players, winners } from '@/db/in-memory-db';
@@ -22,10 +22,10 @@ export class WebSocketBattleship {
 
   private setupWSServer() {
     this.wss.on('connection', (ws: PlayerWS) => {
-      ws.on('message', async (data) => {
+      ws.on('message', (data) => {
         try {
-          const message = await Promise.resolve(JSON.parse(data.toString()) as WebSocketMessage);
-          const payload = message.data ? await Promise.resolve(JSON.parse(message.data) as unknown) : '';
+          const message: WebSocketMessage = JSON.parse(data.toString());
+          const payload: unknown = message.data ? JSON.parse(message.data) : '';
 
           console.log(message.type, message.data);
           this.handleMessage(message.type, payload, ws);
@@ -55,6 +55,10 @@ export class WebSocketBattleship {
       case MessageType.addToRoom:
         this.addToRoom(payload as { indexRoom: string }, ws);
         break;
+      case MessageType.addShips: {
+        this.addShips(payload as Ships);
+        break;
+      }
     }
   }
 
@@ -87,7 +91,7 @@ export class WebSocketBattleship {
 
   private createRoom(first: PlayerWS) {
     const gameId = uuidV4();
-    games.set(gameId, { first, second: null });
+    games.set(gameId, { first, second: null, gameBoard: { activePlayer: 'first', first: [], second: [] } });
     this.broadcastRooms();
   }
 
@@ -101,6 +105,44 @@ export class WebSocketBattleship {
     const gameWithPlayers = [game.first, game.second];
     this.broadcastRooms();
     this.createGame(gameWithPlayers, indexRoom);
+  }
+
+  private addShips(data: Ships) {
+    const game = games.get(data.gameId);
+    if (!game) {
+      return;
+    }
+
+    if (game.first.index === data.indexPlayer) {
+      game.gameBoard.first = data.ships;
+    } else {
+      game.gameBoard.second = data.ships;
+    }
+
+    if (game.gameBoard?.first && game.gameBoard.second) {
+      this.startGame(game, data.gameId);
+    }
+  }
+
+  private startGame(game: Game, gameId: string) {
+    this.sendMessage(
+      MessageType.startGame,
+      {
+        gameId,
+        ships: game.gameBoard.first,
+        currentPlayerIndex: game.first.index,
+      },
+      game.first
+    );
+    this.sendMessage(
+      MessageType.startGame,
+      {
+        gameId,
+        ships: game.gameBoard.second,
+        currentPlayerIndex: game.second!.index,
+      },
+      game.second!
+    );
   }
 
   private createGame(gameWithPlayers: PlayerWS[], idGame: string) {

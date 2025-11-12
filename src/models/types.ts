@@ -25,6 +25,13 @@ export interface Winner {
 export interface Game {
   first: PlayerWS;
   second: PlayerWS | null;
+  gameBoard: GameBoard;
+}
+
+export interface GameBoard {
+  activePlayer: 'first' | 'second';
+  first: Ship[];
+  second: Ship[];
 }
 
 export interface Room {
@@ -45,7 +52,7 @@ export interface Ship {
   type: 'small' | 'medium' | 'large' | 'huge';
 }
 
-export interface GameBoard {
+export interface Ships {
   gameId: string;
   ships: Ship[];
   indexPlayer: string;
