@@ -119,7 +119,7 @@ export class WebSocketBattleship {
       game.gameBoard.second = data.ships;
     }
 
-    if (game.gameBoard?.first && game.gameBoard.second) {
+    if (game.gameBoard?.first.length > 0 && game.gameBoard.second.length > 0) {
       this.startGame(game, data.gameId);
     }
   }
@@ -134,15 +134,27 @@ export class WebSocketBattleship {
       },
       game.first
     );
+
     this.sendMessage(
       MessageType.startGame,
       {
         gameId,
         ships: game.gameBoard.second,
-        currentPlayerIndex: game.second!.index,
+        currentPlayerIndex: game.first.index,
       },
       game.second!
     );
+
+    this.turn(game);
+  }
+
+  private turn(game: Game) {
+    const isFirstActive = game.gameBoard.activePlayer === 'first';
+    const currentPlayer = isFirstActive ? game.first.index : game.second!.index;
+    game.gameBoard.activePlayer = isFirstActive ? 'second' : 'first';
+
+    this.sendMessage(MessageType.turn, { currentPlayer }, game.first);
+    this.sendMessage(MessageType.turn, { currentPlayer }, game.second!);
   }
 
   private createGame(gameWithPlayers: PlayerWS[], idGame: string) {
