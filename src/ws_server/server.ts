@@ -3,6 +3,8 @@ import { WebSocketServer } from 'ws';
 import { v4 as uuidV4 } from 'uuid';
 import { games, players, winners } from '@/db/in-memory-db';
 import { getRooms } from '@/utils/getRooms';
+import { initBoard } from '@/utils/initBoard';
+import { generateShips } from '@/utils/ships-utils';
 
 const PORT = 3000;
 
@@ -89,72 +91,82 @@ export class WebSocketBattleship {
     this.broadcast(MessageType.updateRoom, rooms);
   }
 
-  private createRoom(first: PlayerWS) {
+  private createRoom(player: PlayerWS) {
     const gameId = uuidV4();
-    games.set(gameId, { first, second: null, gameBoard: { activePlayer: 'first', first: [], second: [] } });
+    games.set(gameId, { ...initBoard(player.index, player) });
     this.broadcastRooms();
   }
 
   private addToRoom({ indexRoom }: { indexRoom: string }, ws: PlayerWS) {
     const game = games.get(indexRoom);
-    if (!game || game?.first.index === ws.index) {
+    if (!game || game?.activePlayer === ws.index) {
       return;
     }
 
-    game.second = ws;
-    const gameWithPlayers = [game.first, game.second];
+    game.second.ws = ws;
+
     this.broadcastRooms();
-    this.createGame(gameWithPlayers, indexRoom);
+    this.createGame([game.first.ws, game.second.ws], indexRoom);
   }
 
-  private addShips(data: Ships) {
-    const game = games.get(data.gameId);
+  private addShips({ gameId, indexPlayer, ships }: Ships) {
+    const game = games.get(gameId);
     if (!game) {
       return;
     }
 
-    if (game.first.index === data.indexPlayer) {
-      game.gameBoard.first = data.ships;
+    if (game.first.ws.index === indexPlayer) {
+      game.first = { ...generateShips(ships), ws: game.first.ws, originShips: ships };
     } else {
-      game.gameBoard.second = data.ships;
+      game.second = { ...generateShips(ships), ws: game.second.ws, originShips: ships };
     }
 
-    if (game.gameBoard?.first.length > 0 && game.gameBoard.second.length > 0) {
-      this.startGame(game, data.gameId);
+    const isAllShips = game.first.ships.length > 0 && game.second.ships.length > 0;
+
+    if (isAllShips) {
+      this.startGame(game, gameId);
+    } else {
+      game.activePlayer = indexPlayer;
     }
   }
+
+  // private attack(
+  //   { gameId, indexPlayer, x, y }: { gameId: string; x: number; y: number; indexPlayer: string },
+  //   ws: PlayerWS
+  // ) {
+  //   const game = games.get(gameId);
+  //   if (!game) {
+  //     return;
+  //   }
+  // }
 
   private startGame(game: Game, gameId: string) {
-    this.sendMessage(
-      MessageType.startGame,
-      {
-        gameId,
-        ships: game.gameBoard.first,
-        currentPlayerIndex: game.first.index,
-      },
-      game.first
-    );
+    const players = [game.first, game.second];
 
-    this.sendMessage(
-      MessageType.startGame,
-      {
-        gameId,
-        ships: game.gameBoard.second,
-        currentPlayerIndex: game.first.index,
-      },
-      game.second!
-    );
+    for (const player of players) {
+      this.sendMessage(
+        MessageType.startGame,
+        {
+          gameId,
+          ships: player.originShips,
+          currentPlayerIndex: game.activePlayer,
+        },
+        player.ws
+      );
+    }
 
-    this.turn(game);
+    this.turn(game, false);
   }
 
-  private turn(game: Game) {
-    const isFirstActive = game.gameBoard.activePlayer === 'first';
-    const currentPlayer = isFirstActive ? game.first.index : game.second!.index;
-    game.gameBoard.activePlayer = isFirstActive ? 'second' : 'first';
+  private turn(game: Game, swap: boolean) {
+    const isFirstActive = game.activePlayer === game.first.ws.index;
+    const currentPlayer = isFirstActive ? game.first.ws.index : game.second!.ws.index;
+    if (swap) {
+      game.activePlayer = isFirstActive ? game.second!.ws.index : game.first.ws.index;
+    }
 
-    this.sendMessage(MessageType.turn, { currentPlayer }, game.first);
-    this.sendMessage(MessageType.turn, { currentPlayer }, game.second!);
+    this.sendMessage(MessageType.turn, { currentPlayer }, game.first.ws);
+    this.sendMessage(MessageType.turn, { currentPlayer }, game.second.ws);
   }
 
   private createGame(gameWithPlayers: PlayerWS[], idGame: string) {

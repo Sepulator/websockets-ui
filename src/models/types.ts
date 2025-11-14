@@ -23,15 +23,17 @@ export interface Winner {
 }
 
 export interface Game {
-  first: PlayerWS;
-  second: PlayerWS | null;
-  gameBoard: GameBoard;
+  activePlayer: string;
+  first: GameBoard;
+  second: GameBoard;
 }
 
 export interface GameBoard {
-  activePlayer: 'first' | 'second';
-  first: Ship[];
-  second: Ship[];
+  ws: PlayerWS;
+  originShips: Ship[];
+  ships: Position[][];
+  shots: Position[];
+  killed: Position[][];
 }
 
 export interface Room {
@@ -62,6 +64,8 @@ export interface Position {
   x: number;
   y: number;
 }
+
+export type ShotStatus = 'miss' | 'killed' | 'shot';
 
 export enum MessageType {
   auth = 'reg',
