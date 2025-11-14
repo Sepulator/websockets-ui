@@ -72,6 +72,8 @@ export interface AttackData {
   indexPlayer: string;
 }
 
+export type RandomAttackData = Omit<AttackData, 'x' | 'y'>;
+
 export type ShotStatus = 'miss' | 'killed' | 'shot';
 
 export enum MessageType {

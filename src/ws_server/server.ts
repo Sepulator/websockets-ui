@@ -5,6 +5,7 @@ import {
   PlayerAuth,
   PlayerWS,
   Position,
+  RandomAttackData,
   Ships,
   ShotStatus,
   WebSocketMessage,
@@ -14,7 +15,7 @@ import { v4 as uuidV4 } from 'uuid';
 import { games, players, winners } from '@/db/in-memory-db';
 import { getRooms } from '@/utils/getRooms';
 import { initBoard } from '@/utils/initBoard';
-import { attackShip, generateShips } from '@/utils/ships-utils';
+import { attackShip, generateShips, getRandomCell } from '@/utils/ships-utils';
 
 const PORT = 3000;
 
@@ -72,6 +73,9 @@ export class WebSocketBattleship {
         break;
       case MessageType.attack:
         this.attack(payload as AttackData);
+        break;
+      case MessageType.randomAttack:
+        this.randomAttack(payload as RandomAttackData);
         break;
     }
   }
@@ -193,6 +197,24 @@ export class WebSocketBattleship {
     }
 
     this.checkWin(game, indexPlayer);
+  }
+
+  private randomAttack({ gameId, indexPlayer }: RandomAttackData) {
+    const game = games.get(gameId);
+    if (!game) {
+      return;
+    }
+
+    const isFirst = indexPlayer === game.first.ws.index;
+    const shots = isFirst ? game.first.shots : game.second.shots;
+    const boardSize = game.first.ships.length;
+    let cell = getRandomCell(boardSize);
+
+    while (shots.some((shot) => shot.x === cell.x && shot.y === cell.y)) {
+      cell = getRandomCell(boardSize);
+    }
+
+    this.attack({ gameId, indexPlayer, x: cell.x, y: cell.y });
   }
 
   private checkWin(game: Game, indexPlayer: string) {

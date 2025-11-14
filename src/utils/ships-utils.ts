@@ -19,7 +19,6 @@ export const generateShips = (ships: Ship[]): { ships: Position[][]; killed: Pos
     killedPositions.push([]);
   }
 
-  console.log(shipPositions);
   return { ships: shipPositions, killed: killedPositions, shots: [] };
 };
 
@@ -80,4 +79,10 @@ export const attackShip = (
   }
 
   return { ships, killed, edgeCells, killedShip, shotStatus };
+};
+
+export const getRandomCell = (boardSize: number): Position => {
+  const x = Math.ceil(Math.random() * boardSize) - 1;
+  const y = Math.ceil(Math.random() * boardSize) - 1;
+  return { x, y };
 };
