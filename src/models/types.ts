@@ -65,6 +65,13 @@ export interface Position {
   y: number;
 }
 
+export interface AttackData {
+  gameId: string;
+  x: number;
+  y: number;
+  indexPlayer: string;
+}
+
 export type ShotStatus = 'miss' | 'killed' | 'shot';
 
 export enum MessageType {

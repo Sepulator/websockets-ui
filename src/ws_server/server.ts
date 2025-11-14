@@ -1,10 +1,20 @@
-import { Game, MessageType, PlayerAuth, PlayerWS, Ships, WebSocketMessage } from '@/models/types';
+import {
+  AttackData,
+  Game,
+  MessageType,
+  PlayerAuth,
+  PlayerWS,
+  Position,
+  Ships,
+  ShotStatus,
+  WebSocketMessage,
+} from '@/models/types';
 import { WebSocketServer } from 'ws';
 import { v4 as uuidV4 } from 'uuid';
 import { games, players, winners } from '@/db/in-memory-db';
 import { getRooms } from '@/utils/getRooms';
 import { initBoard } from '@/utils/initBoard';
-import { generateShips } from '@/utils/ships-utils';
+import { attackShip, generateShips } from '@/utils/ships-utils';
 
 const PORT = 3000;
 
@@ -57,10 +67,12 @@ export class WebSocketBattleship {
       case MessageType.addToRoom:
         this.addToRoom(payload as { indexRoom: string }, ws);
         break;
-      case MessageType.addShips: {
+      case MessageType.addShips:
         this.addShips(payload as Ships);
         break;
-      }
+      case MessageType.attack:
+        this.attack(payload as AttackData);
+        break;
     }
   }
 
@@ -99,7 +111,7 @@ export class WebSocketBattleship {
 
   private addToRoom({ indexRoom }: { indexRoom: string }, ws: PlayerWS) {
     const game = games.get(indexRoom);
-    if (!game || game?.activePlayer === ws.index) {
+    if (!game || game.first.ws.index === ws.index) {
       return;
     }
 
@@ -130,15 +142,80 @@ export class WebSocketBattleship {
     }
   }
 
-  // private attack(
-  //   { gameId, indexPlayer, x, y }: { gameId: string; x: number; y: number; indexPlayer: string },
-  //   ws: PlayerWS
-  // ) {
-  //   const game = games.get(gameId);
-  //   if (!game) {
-  //     return;
-  //   }
-  // }
+  private attack({ gameId, indexPlayer, x, y }: AttackData) {
+    const game = games.get(gameId);
+    if (!game) {
+      return;
+    }
+
+    if (indexPlayer !== game.activePlayer) {
+      return;
+    }
+
+    const isFirst = indexPlayer === game.first.ws.index;
+    const attackedPlayer = isFirst ? game.second : game.first;
+    const { killed, shots, ships } = attackedPlayer;
+
+    if (shots.some((shot) => shot.x === x && shot.y === y)) {
+      this.turn(game, false);
+      return;
+    } else {
+      shots.push({ x, y });
+    }
+
+    const boardSize = game.first.originShips.length;
+    const attackData = attackShip({ x, y }, ships, killed, boardSize);
+
+    if (isFirst) {
+      game.second.killed = attackData.killed;
+      game.second.ships = attackData.ships;
+    } else {
+      game.first.killed = attackData.killed;
+      game.first.ships = attackData.ships;
+    }
+
+    this.sendAttack({ x, y }, game, attackData.shotStatus, indexPlayer);
+
+    if (attackData.shotStatus === 'killed' && attackData.edgeCells && attackData.killedShip) {
+      for (const cell of attackData.edgeCells) {
+        this.sendAttack({ x: cell.x, y: cell.y }, game, 'miss', indexPlayer);
+      }
+
+      for (const cell of attackData.killedShip) {
+        this.sendAttack({ x: cell.x, y: cell.y }, game, 'killed', indexPlayer);
+      }
+    }
+
+    if (attackData.shotStatus === 'miss') {
+      this.turn(game, true);
+    } else {
+      this.turn(game, false);
+    }
+
+    this.checkWin(game, indexPlayer);
+  }
+
+  private checkWin(game: Game, indexPlayer: string) {
+    const allShipsKilled = (playerShips: Position[][]) => playerShips.every((ship) => ship.length === 0);
+
+    if (allShipsKilled(game.first.ships) || allShipsKilled(game.second.ships)) {
+      const winner = players.get(indexPlayer);
+      if (winner) {
+        winners.push({ name: winner.name, wins: 1 });
+      }
+      this.sendMessage(MessageType.finishGame, { winPlayer: indexPlayer }, game.first.ws);
+      this.sendMessage(MessageType.finishGame, { winPlayer: indexPlayer }, game.second.ws);
+      this.broadcastWinners();
+    }
+  }
+
+  private sendAttack(position: Position, game: Game, status: ShotStatus, currentPlayer: string) {
+    const players = [game.first, game.second];
+
+    for (const player of players) {
+      this.sendMessage(MessageType.attack, { position, currentPlayer, status }, player.ws);
+    }
+  }
 
   private startGame(game: Game, gameId: string) {
     const players = [game.first, game.second];
@@ -146,11 +223,7 @@ export class WebSocketBattleship {
     for (const player of players) {
       this.sendMessage(
         MessageType.startGame,
-        {
-          gameId,
-          ships: player.originShips,
-          currentPlayerIndex: game.activePlayer,
-        },
+        { gameId, ships: player.originShips, currentPlayerIndex: game.activePlayer },
         player.ws
       );
     }
@@ -159,12 +232,12 @@ export class WebSocketBattleship {
   }
 
   private turn(game: Game, swap: boolean) {
-    const isFirstActive = game.activePlayer === game.first.ws.index;
-    const currentPlayer = isFirstActive ? game.first.ws.index : game.second!.ws.index;
     if (swap) {
+      const isFirstActive = game.activePlayer === game.first.ws.index;
       game.activePlayer = isFirstActive ? game.second!.ws.index : game.first.ws.index;
     }
 
+    const currentPlayer = game.activePlayer;
     this.sendMessage(MessageType.turn, { currentPlayer }, game.first.ws);
     this.sendMessage(MessageType.turn, { currentPlayer }, game.second.ws);
   }
