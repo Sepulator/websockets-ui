@@ -16,6 +16,7 @@ import { games, players, winners } from '@/db/in-memory-db';
 import { getRooms } from '@/utils/getRooms';
 import { initBoard } from '@/utils/initBoard';
 import { attackShip, generateShips, getRandomCell } from '@/utils/ships-utils';
+import { isUniqueName } from '@/utils/checkName';
 
 const PORT = 3000;
 
@@ -82,6 +83,12 @@ export class WebSocketBattleship {
 
   private authPlayer({ name, password }: PlayerAuth, ws: PlayerWS) {
     const index = uuidV4();
+
+    if (isUniqueName(name)) {
+      this.sendMessage(MessageType.auth, { name, index, error: true, errorText: 'Name already exist' }, ws);
+      return;
+    }
+
     ws.name = name;
     ws.index = index;
     players.set(index, { index, name, password, ws });
