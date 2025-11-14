@@ -19,6 +19,7 @@ export const generateShips = (ships: Ship[]): { ships: Position[][]; killed: Pos
     killedPositions.push([]);
   }
 
+  console.log(shipPositions);
   return { ships: shipPositions, killed: killedPositions, shots: [] };
 };
 
@@ -86,3 +87,16 @@ export const getRandomCell = (boardSize: number): Position => {
   const y = Math.ceil(Math.random() * boardSize) - 1;
   return { x, y };
 };
+
+export const predefinedShips: Ship[] = [
+  { position: { x: 9, y: 2 }, direction: true, type: 'huge', length: 4 },
+  { position: { x: 4, y: 4 }, direction: false, type: 'large', length: 3 },
+  { position: { x: 3, y: 2 }, direction: false, type: 'large', length: 3 },
+  { position: { x: 1, y: 7 }, direction: true, type: 'medium', length: 2 },
+  { position: { x: 3, y: 8 }, direction: false, type: 'medium', length: 2 },
+  { position: { x: 0, y: 0 }, direction: true, type: 'medium', length: 2 },
+  { position: { x: 6, y: 8 }, direction: false, type: 'small', length: 1 },
+  { position: { x: 6, y: 6 }, direction: false, type: 'small', length: 1 },
+  { position: { x: 0, y: 3 }, direction: true, type: 'small', length: 1 },
+  { position: { x: 3, y: 6 }, direction: false, type: 'small', length: 1 },
+];

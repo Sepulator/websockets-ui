@@ -29,7 +29,7 @@ export interface Game {
 }
 
 export interface GameBoard {
-  ws: PlayerWS;
+  ws?: PlayerWS;
   originShips: Ship[];
   ships: Position[][];
   shots: Position[];
@@ -89,4 +89,5 @@ export enum MessageType {
   attack = 'attack',
   turn = 'turn',
   randomAttack = 'randomAttack',
+  singlePlay = 'single_play',
 }

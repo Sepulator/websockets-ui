@@ -12,10 +12,10 @@ import {
 } from '@/models/types';
 import { WebSocketServer } from 'ws';
 import { v4 as uuidV4 } from 'uuid';
-import { games, players, winners } from '@/db/in-memory-db';
+import { bot, games, players, winners } from '@/db/in-memory-db';
 import { getRooms } from '@/utils/getRooms';
 import { initBoard } from '@/utils/initBoard';
-import { attackShip, generateShips, getRandomCell } from '@/utils/ships-utils';
+import { attackShip, generateShips, getRandomCell, predefinedShips } from '@/utils/ships-utils';
 import { isUniqueName } from '@/utils/checkName';
 
 const PORT = 3000;
@@ -78,6 +78,9 @@ export class WebSocketBattleship {
       case MessageType.randomAttack:
         this.randomAttack(payload as RandomAttackData);
         break;
+      case MessageType.singlePlay:
+        this.singlePlay(ws);
+        break;
     }
   }
 
@@ -118,18 +121,20 @@ export class WebSocketBattleship {
     const gameId = uuidV4();
     games.set(gameId, { ...initBoard(player.index, player) });
     this.broadcastRooms();
+    return gameId;
   }
 
   private addToRoom({ indexRoom }: { indexRoom: string }, ws: PlayerWS) {
     const game = games.get(indexRoom);
-    if (!game || game.first.ws.index === ws.index) {
+    if (!game || game.first.ws?.index === ws.index) {
       return;
     }
 
     game.second.ws = ws;
 
     this.broadcastRooms();
-    this.createGame([game.first.ws, game.second.ws], indexRoom);
+
+    this.createGame([game.first.ws!, game.second.ws], indexRoom);
   }
 
   private addShips({ gameId, indexPlayer, ships }: Ships) {
@@ -138,7 +143,7 @@ export class WebSocketBattleship {
       return;
     }
 
-    if (game.first.ws.index === indexPlayer) {
+    if (game.first.ws?.index === indexPlayer) {
       game.first = { ...generateShips(ships), ws: game.first.ws, originShips: ships };
     } else {
       game.second = { ...generateShips(ships), ws: game.second.ws, originShips: ships };
@@ -163,12 +168,12 @@ export class WebSocketBattleship {
       return;
     }
 
-    const isFirst = indexPlayer === game.first.ws.index;
+    const isFirst = indexPlayer === game.first.ws?.index;
     const attackedPlayer = isFirst ? game.second : game.first;
     const { killed, shots, ships } = attackedPlayer;
 
     if (shots.some((shot) => shot.x === x && shot.y === y)) {
-      this.turn(game, false);
+      this.turn(game, false, gameId);
       return;
     } else {
       shots.push({ x, y });
@@ -198,9 +203,9 @@ export class WebSocketBattleship {
     }
 
     if (attackData.shotStatus === 'miss') {
-      this.turn(game, true);
+      this.turn(game, true, gameId);
     } else {
-      this.turn(game, false);
+      this.turn(game, false, gameId);
     }
 
     this.checkWin(game, indexPlayer);
@@ -212,7 +217,7 @@ export class WebSocketBattleship {
       return;
     }
 
-    const isFirst = indexPlayer === game.first.ws.index;
+    const isFirst = indexPlayer === game.first.ws?.index;
     const shots = isFirst ? game.first.shots : game.second.shots;
     const boardSize = game.first.ships.length;
     let cell = getRandomCell(boardSize);
@@ -257,18 +262,32 @@ export class WebSocketBattleship {
       );
     }
 
-    this.turn(game, false);
+    const swapSide = game.second.ws?.index === bot ? true : false;
+
+    this.turn(game, swapSide, gameId);
   }
 
-  private turn(game: Game, swap: boolean) {
+  private singlePlay(ws: PlayerWS) {
+    const bot = { index: 'bot', name: 'bot' } as PlayerWS;
+    const gameId = this.createRoom(ws);
+    this.addToRoom({ indexRoom: gameId }, bot);
+    this.addShips({ gameId, indexPlayer: bot.index, ships: predefinedShips });
+  }
+
+  private turn(game: Game, swap: boolean, gameId?: string) {
     if (swap) {
-      const isFirstActive = game.activePlayer === game.first.ws.index;
-      game.activePlayer = isFirstActive ? game.second!.ws.index : game.first.ws.index;
+      const isFirstActive = game.activePlayer === game.first.ws?.index;
+      game.activePlayer = isFirstActive ? game.second.ws!.index : game.first.ws!.index;
     }
 
     const currentPlayer = game.activePlayer;
     this.sendMessage(MessageType.turn, { currentPlayer }, game.first.ws);
     this.sendMessage(MessageType.turn, { currentPlayer }, game.second.ws);
+
+    if (game.activePlayer === bot && gameId) {
+      const boardSize = game.second.originShips.length;
+      this.attack({ gameId, indexPlayer: bot, ...getRandomCell(boardSize) });
+    }
   }
 
   private createGame(gameWithPlayers: PlayerWS[], idGame: string) {
@@ -277,7 +296,10 @@ export class WebSocketBattleship {
     }
   }
 
-  private sendMessage(type: MessageType, data: unknown, ws: PlayerWS) {
+  private sendMessage(type: MessageType, data: unknown, ws: PlayerWS | undefined) {
+    if (!ws?.send) {
+      return;
+    }
     ws.send(
       JSON.stringify({
         type,
