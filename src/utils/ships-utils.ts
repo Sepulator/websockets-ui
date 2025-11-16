@@ -69,7 +69,9 @@ export const attackShip = (
         ships[shipIndex].splice(cellIndex, 1);
         shotStatus = 'shot';
 
-        if (ships[shipIndex].length === 0) {
+        const isShipKilled = ships[shipIndex].length === 0;
+
+        if (isShipKilled) {
           const data = getEdgeCells(killed[shipIndex], boardSize);
           edgeCells = data.edgeCells;
           killedShip = data.killedShip;

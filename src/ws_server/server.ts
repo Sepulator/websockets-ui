@@ -13,10 +13,10 @@ import {
 import { WebSocketServer } from 'ws';
 import { v4 as uuidV4 } from 'uuid';
 import { bot, games, players, winners } from '@/db/in-memory-db';
-import { getRooms } from '@/utils/getRooms';
-import { initBoard } from '@/utils/initBoard';
+import { getRooms } from '@/utils/get-rooms';
+import { initBoard } from '@/utils/init-board';
 import { attackShip, generateShips, getRandomCell, predefinedShips } from '@/utils/ships-utils';
-import { isUniqueName } from '@/utils/checkName';
+import { checkName } from '@/utils/check-name';
 
 const PORT = 3000;
 
@@ -86,8 +86,9 @@ export class WebSocketBattleship {
 
   private authPlayer({ name, password }: PlayerAuth, ws: PlayerWS) {
     const index = uuidV4();
+    const isNameUnique = checkName(name);
 
-    if (isUniqueName(name)) {
+    if (isNameUnique) {
       this.sendMessage(MessageType.auth, { name, index, error: true, errorText: 'Name already exist' }, ws);
       return;
     }
